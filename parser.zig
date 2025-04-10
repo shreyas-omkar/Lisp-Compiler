@@ -3,7 +3,13 @@ const ast = @import("ast.zig");
 
 pub fn parse(tokens: []const []const u8, allocator: std.mem.Allocator) !ast.Expr {
     var index: usize = 0;
-    return try parseExpr(tokens, &index, allocator);
+    const expr = try parseExpr(tokens, &index, allocator);
+
+    if (index != tokens.len) {
+        return error.ExtraTokensAfterExpression;
+    }
+
+    return expr;
 }
 
 fn parseExpr(tokens: []const []const u8, index: *usize, allocator: std.mem.Allocator) !ast.Expr {

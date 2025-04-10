@@ -1,6 +1,7 @@
 const std = @import("std");
 const tokeniser = @import("tokeniser.zig");
 const parser = @import("parser.zig");
+const evaluator = @import("evaluator.zig");
 
 pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
@@ -40,9 +41,16 @@ pub fn main() !void {
             try stdout.print("Errors in Parsing : {}\n", .{err});
             continue;
         };
-
         try parser.printExpr(parsed, stdout);
         std.debug.print("Parsed AST: {any}\n", .{parsed});
+        try stdout.print("\n", .{});
+
+        const evaluated = evaluator.eval(parsed, allocator) catch |err| {
+            try stdout.print("Evaluation Error: {}\n", .{err});
+            continue;
+        };
+
+        try parser.printExpr(evaluated, stdout);
         try stdout.print("\n", .{});
     }
 }
