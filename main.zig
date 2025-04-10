@@ -1,5 +1,6 @@
 const std = @import("std");
 const tokeniser = @import("tokeniser.zig");
+const parser = @import("parser.zig");
 
 pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
@@ -32,5 +33,16 @@ pub fn main() !void {
         for (tokens, 1..) |token, tokenNo| {
             try stdout.print("Token No. {d}: {s}\n", .{ tokenNo, token });
         }
+
+        // Parser
+
+        const parsed = parser.parse(tokens, allocator) catch |err| {
+            try stdout.print("Errors in Parsing : {}\n", .{err});
+            continue;
+        };
+
+        try parser.printExpr(parsed, stdout);
+        std.debug.print("Parsed AST: {any}\n", .{parsed});
+        try stdout.print("\n", .{});
     }
 }
