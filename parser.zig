@@ -27,7 +27,6 @@ fn parseExpr(tokens: []const []const u8, index: *usize, allocator: std.mem.Alloc
     }
 
     if (std.mem.eql(u8, token, "(")) {
-        // Check if this is a special form
         if (index.* < tokens.len) {
             const next_token = tokens[index.*];
 
@@ -42,8 +41,7 @@ fn parseExpr(tokens: []const []const u8, index: *usize, allocator: std.mem.Alloc
                 return parseLambda(tokens, index, allocator);
             }
         }
-
-        // Regular list parsing
+//List Pasig
         var exprs = std.ArrayList(ast.Expr).init(allocator);
 
         while (index.* < tokens.len and !std.mem.eql(u8, tokens[index.*], ")")) {
@@ -54,7 +52,7 @@ fn parseExpr(tokens: []const []const u8, index: *usize, allocator: std.mem.Alloc
             return ParserError.MissingClosingParen;
         }
 
-        index.* += 1; // skip closing ')'
+        index.* += 1; 
 
         const list_expr_ptr = try allocator.create(ast.ListExpr);
         var expr_ptrs = try allocator.alloc(*ast.Expr, exprs.items.len);
@@ -103,7 +101,7 @@ fn parseDefine(tokens: []const []const u8, index: *usize, allocator: std.mem.All
     if (index.* >= tokens.len or !std.mem.eql(u8, tokens[index.*], ")")) {
         return ParserError.MissingClosingParen;
     }
-    index.* += 1; // consume ")"
+    index.* += 1; 
 
     const value_ptr = try allocator.create(ast.Expr);
     value_ptr.* = value_expr;
@@ -127,7 +125,7 @@ fn parseIf(tokens: []const []const u8, index: *usize, allocator: std.mem.Allocat
     if (index.* >= tokens.len or !std.mem.eql(u8, tokens[index.*], ")")) {
         return ParserError.MissingClosingParen;
     }
-    index.* += 1; // consume ")"
+    index.* += 1; 
 
     const cond_ptr = try allocator.create(ast.Expr);
     cond_ptr.* = cond_expr;
@@ -154,11 +152,11 @@ fn parseLambda(tokens: []const []const u8, index: *usize, allocator: std.mem.All
     if (!std.mem.eql(u8, tokens[index.*], "(")) {
         return ParserError.InvalidLambdaSyntax;
     }
-    index.* += 1; // consume "("
+    index.* += 1;
 
     var params = std.ArrayList([]const u8).init(allocator);
 
-    // Parse parameters
+  
     while (index.* < tokens.len and !std.mem.eql(u8, tokens[index.*], ")")) {
         const param = tokens[index.*];
         try params.append(param);
@@ -168,7 +166,7 @@ fn parseLambda(tokens: []const []const u8, index: *usize, allocator: std.mem.All
     if (index.* >= tokens.len) {
         return ParserError.MissingClosingParen;
     }
-    index.* += 1; // consume ")" for parameters
+    index.* += 1;
 
     // Parse body
     const body_expr = try parseExpr(tokens, index, allocator);
@@ -177,7 +175,7 @@ fn parseLambda(tokens: []const []const u8, index: *usize, allocator: std.mem.All
     if (index.* >= tokens.len or !std.mem.eql(u8, tokens[index.*], ")")) {
         return ParserError.MissingClosingParen;
     }
-    index.* += 1; // consume ")"
+    index.* += 1;
 
     const body_ptr = try allocator.create(ast.Expr);
     body_ptr.* = body_expr;
