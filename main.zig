@@ -45,7 +45,7 @@ pub fn main() !void {
         std.debug.print("Parsed AST: {any}\n", .{parsed});
         try stdout.print("\n", .{});
 
-        const evaluated = evaluator.eval(parsed, allocator) catch |err| {
+        const evaluated = evaluator.eval(parsed) catch |err| {
             try stdout.print("Evaluation Error: {}\n", .{err});
             continue;
         };

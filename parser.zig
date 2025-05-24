@@ -21,12 +21,29 @@ fn parseExpr(tokens: []const []const u8, index: *usize, allocator: std.mem.Alloc
     const token = tokens[index.*];
     index.* += 1;
 
-    //Handling Let
+    // Handling Let
     if (std.mem.eql(u8, token, "let")) {
         return parseLet(tokens, index, allocator);
     }
 
     if (std.mem.eql(u8, token, "(")) {
+        // Check if this is a special form
+        if (index.* < tokens.len) {
+            const next_token = tokens[index.*];
+
+            if (std.mem.eql(u8, next_token, "define")) {
+                index.* += 1; // consume "define"
+                return parseDefine(tokens, index, allocator);
+            } else if (std.mem.eql(u8, next_token, "if")) {
+                index.* += 1; // consume "if"
+                return parseIf(tokens, index, allocator);
+            } else if (std.mem.eql(u8, next_token, "lambda")) {
+                index.* += 1; // consume "lambda"
+                return parseLambda(tokens, index, allocator);
+            }
+        }
+
+        // Regular list parsing
         var exprs = std.ArrayList(ast.Expr).init(allocator);
 
         while (index.* < tokens.len and !std.mem.eql(u8, tokens[index.*], ")")) {
@@ -58,13 +75,123 @@ fn parseExpr(tokens: []const []const u8, index: *usize, allocator: std.mem.Alloc
     } else if (std.fmt.parseInt(i64, token, 10)) |num| {
         return ast.Expr{ .Number = num };
     } else |_| {
+        // Check for boolean literals
+        if (std.mem.eql(u8, token, "true")) {
+            return ast.Expr{ .Bool = true };
+        } else if (std.mem.eql(u8, token, "false")) {
+            return ast.Expr{ .Bool = false };
+        }
         return ast.Expr{ .Symbol = token };
     }
+}
+
+fn parseDefine(tokens: []const []const u8, index: *usize, allocator: std.mem.Allocator) ParserError!ast.Expr {
+    if (index.* >= tokens.len) {
+        return ParserError.InvalidDefineSyntax;
+    }
+
+    const name = tokens[index.*];
+    index.* += 1;
+
+    if (index.* >= tokens.len) {
+        return ParserError.InvalidDefineSyntax;
+    }
+
+    const value_expr = try parseExpr(tokens, index, allocator);
+
+    // Expect closing parenthesis
+    if (index.* >= tokens.len or !std.mem.eql(u8, tokens[index.*], ")")) {
+        return ParserError.MissingClosingParen;
+    }
+    index.* += 1; // consume ")"
+
+    const value_ptr = try allocator.create(ast.Expr);
+    value_ptr.* = value_expr;
+
+    return ast.Expr{ .Define = ast.Expr.DefineExpr{
+        .name = name,
+        .value = value_ptr,
+    } };
+}
+
+fn parseIf(tokens: []const []const u8, index: *usize, allocator: std.mem.Allocator) ParserError!ast.Expr {
+    if (index.* + 2 >= tokens.len) {
+        return ParserError.InvalidIfSyntax;
+    }
+
+    const cond_expr = try parseExpr(tokens, index, allocator);
+    const then_expr = try parseExpr(tokens, index, allocator);
+    const else_expr = try parseExpr(tokens, index, allocator);
+
+    // Expect closing parenthesis
+    if (index.* >= tokens.len or !std.mem.eql(u8, tokens[index.*], ")")) {
+        return ParserError.MissingClosingParen;
+    }
+    index.* += 1; // consume ")"
+
+    const cond_ptr = try allocator.create(ast.Expr);
+    cond_ptr.* = cond_expr;
+
+    const then_ptr = try allocator.create(ast.Expr);
+    then_ptr.* = then_expr;
+
+    const else_ptr = try allocator.create(ast.Expr);
+    else_ptr.* = else_expr;
+
+    return ast.Expr{ .If = ast.Expr.IfExpr{
+        .cond = cond_ptr,
+        .then_branch = then_ptr,
+        .else_branch = else_ptr,
+    } };
+}
+
+fn parseLambda(tokens: []const []const u8, index: *usize, allocator: std.mem.Allocator) ParserError!ast.Expr {
+    if (index.* >= tokens.len) {
+        return ParserError.InvalidLambdaSyntax;
+    }
+
+    // Expect parameter list
+    if (!std.mem.eql(u8, tokens[index.*], "(")) {
+        return ParserError.InvalidLambdaSyntax;
+    }
+    index.* += 1; // consume "("
+
+    var params = std.ArrayList([]const u8).init(allocator);
+
+    // Parse parameters
+    while (index.* < tokens.len and !std.mem.eql(u8, tokens[index.*], ")")) {
+        const param = tokens[index.*];
+        try params.append(param);
+        index.* += 1;
+    }
+
+    if (index.* >= tokens.len) {
+        return ParserError.MissingClosingParen;
+    }
+    index.* += 1; // consume ")" for parameters
+
+    // Parse body
+    const body_expr = try parseExpr(tokens, index, allocator);
+
+    // Expect closing parenthesis for lambda
+    if (index.* >= tokens.len or !std.mem.eql(u8, tokens[index.*], ")")) {
+        return ParserError.MissingClosingParen;
+    }
+    index.* += 1; // consume ")"
+
+    const body_ptr = try allocator.create(ast.Expr);
+    body_ptr.* = body_expr;
+
+    return ast.Expr{ .Lambda = ast.Expr.LambdaExpr{
+        .params = try params.toOwnedSlice(),
+        .body = body_ptr,
+    } };
 }
 
 pub fn printExpr(expr: ast.Expr, writer: anytype) !void {
     switch (expr) {
         .Number => |n| try writer.print("{d}", .{n}),
+        .Bool => |b| try writer.print("{}", .{b}),
         .Symbol => |s| try writer.print("{s}", .{s}),
         .Let => |let_ptr| {
             try writer.print("(let {s} ", .{let_ptr.name});
@@ -89,6 +216,31 @@ pub fn printExpr(expr: ast.Expr, writer: anytype) !void {
                 if (i != li.items.len - 1)
                     try writer.print(" ", .{});
             }
+            try writer.print(")", .{});
+        },
+        .Define => |define_expr| {
+            try writer.print("(define {s} ", .{define_expr.name});
+            try printExpr(define_expr.value.*, writer);
+            try writer.print(")", .{});
+        },
+        .If => |if_expr| {
+            try writer.print("(if ", .{});
+            try printExpr(if_expr.cond.*, writer);
+            try writer.print(" ", .{});
+            try printExpr(if_expr.then_branch.*, writer);
+            try writer.print(" ", .{});
+            try printExpr(if_expr.else_branch.*, writer);
+            try writer.print(")", .{});
+        },
+        .Lambda => |lambda_expr| {
+            try writer.print("(lambda (", .{});
+            for (lambda_expr.params, 0..) |param, i| {
+                try writer.print("{s}", .{param});
+                if (i != lambda_expr.params.len - 1)
+                    try writer.print(" ", .{});
+            }
+            try writer.print(") ", .{});
+            try printExpr(lambda_expr.body.*, writer);
             try writer.print(")", .{});
         },
     }

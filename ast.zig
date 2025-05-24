@@ -2,10 +2,30 @@ const std = @import("std");
 
 pub const Expr = union(enum) {
     Number: i64,
+    Bool: bool,
     Symbol: []const u8,
     Let: *LetBinding,
     FuncDef: *FunctionDefinition,
     List: *ListExpr,
+    Define: DefineExpr,
+    If: IfExpr,
+    Lambda: LambdaExpr,
+
+    pub const DefineExpr = struct {
+        name: []const u8,
+        value: *Expr,
+    };
+
+    pub const IfExpr = struct {
+        cond: *Expr,
+        then_branch: *Expr,
+        else_branch: *Expr,
+    };
+
+    pub const LambdaExpr = struct {
+        params: []const []const u8,
+        body: *Expr,
+    };
 };
 
 pub const TypeTag = enum {
@@ -47,5 +67,8 @@ pub const ParserError = error{
     InvalidFunctionFormat,
     InvalidFunctionParameters,
     InvalidFunctionParameterName,
+    InvalidDefineSyntax,
+    InvalidIfSyntax,
+    InvalidLambdaSyntax,
     OutOfMemory,
 };
