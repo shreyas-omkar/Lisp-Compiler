@@ -68,11 +68,10 @@ fn lookupSymbol(symbol: []const u8) EvalError!Expr {
 
 fn evalDefine(def: DefineExpr) EvalError!Expr {
     const value = try eval(def.value.*);
-    // Store in global environment
     global_env.put(def.name, value) catch return EvalError.OutOfMemory;
     std.debug.print("Define: {s} = ", .{def.name});
     printExpr(value);
-    return value; // Return the value itself, not the define expression
+    return value;
 }
 
 fn evalIf(if_expr: IfExpr) EvalError!Expr {
@@ -149,7 +148,6 @@ fn applyArithmetic(op: []const u8, args: []Expr) EvalError!Expr {
         return EvalError.ArityMismatch;
     }
 
-    // Check all args are numbers
     for (args) |arg| {
         if (arg != .Number) {
             std.debug.print("Arithmetic operator {s} requires numeric arguments\n", .{op});
@@ -190,7 +188,6 @@ fn applyComparison(op: []const u8, args: []Expr) EvalError!Expr {
         return EvalError.ArityMismatch;
     }
 
-    // For simplicity, only handle number comparisons for now
     if (args[0] != .Number or args[1] != .Number) {
         std.debug.print("Comparison operator {s} requires numeric arguments\n", .{op});
         return EvalError.TypeMismatch;
